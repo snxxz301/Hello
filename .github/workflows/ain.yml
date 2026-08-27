@@ -1,0 +1,43 @@
+name: Windows-RDP-Tailscale
+
+on: 
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 360
+
+    steps:
+    - name: Baixando e Instalando o Tailscale
+      run: |
+        Invoke-WebRequest -Uri "https://tailscale.com" -OutFile "tailscale-setup.exe"
+        Start-Process -FilePath ".\tailscale-setup.exe" -ArgumentList "/quiet", "/norestart" -Wait
+
+    - name: Conectando à rede Tailscale
+      run: |
+        & "C:\Program Files\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }}
+
+    - name: Ativando o Acesso Remoto (RDP)
+      run: |
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
+
+    - name: Criando Usuario e Senha
+      run: |
+        $Password = ConvertTo-SecureString "SenhaSegura123!" -AsPlainText -Force
+        New-LocalUser "GitHubAdmin" -Password $Password -Description "RDP Admin"
+        Add-LocalGroupMember -Group "Administradores" -Member "GitHubAdmin"
+        Add-LocalGroupMember -Group "Usuários da área de trabalho remota" -Member "GitHubAdmin"
+
+    - name: Mantendo a Máquina Ativa
+      run: |
+        Write-Host "=========================================================="
+        Write-Host "MÁQUINA CONECTADA AO SEU PAINEL TAILSCALE!"
+        Write-Host "Abra o aplicativo Tailscale no seu PC para ver o IP dela."
+        Write-Host "Usuário: GitHubAdmin"
+        Write-Host "Senha: SenhaSegura123!"
+        Write-Host "=========================================================="
+        Start-Sleep -Seconds 21600
+
