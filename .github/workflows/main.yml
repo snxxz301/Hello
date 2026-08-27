@@ -1,0 +1,36 @@
+name: Windows RDP com Tailscale
+on: [workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout do repositorio
+        uses: actions/checkout@v4
+
+      - name: Conectar ao Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
+
+      - name: Ativar RDP e Liberar Firewall
+        run: |
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          
+      - name: Criar Usuario e Senha
+        run: |
+          $Password = ConvertTo-SecureString "MinhaSenhaSegura123!" -AsPlainText -Force
+          Set-LocalUser -Name "runneradmin" -Password $Password
+
+      - name: Exibir IP e Manter Conexao
+        run: |
+          Write-Host "=== DADOS DE ACESSO ==="
+          Write-Host "Usuario: runneradmin"
+          Write-Host "Senha: MinhaSenhaSegura123!"
+          Write-Host "Buscando IP do Tailscale..."
+          & "C:\Program Files\Tailscale\tailscale.exe" ip -4
+          Write-Host "======================="
+          # Mantem a maquina ativa por ate 6 horas
+          Start-Sleep -Seconds 21600
+
