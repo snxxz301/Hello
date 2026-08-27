@@ -1,0 +1,47 @@
+name: Windows-RDP
+
+on: 
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 360
+
+    steps:
+    - name: Baixando e configurando o Ngrok
+      run: |
+        Invoke-WebRequest https://equinox.io -OutFile ngrok.zip
+        Expand-Archive ngrok.zip
+        ./ngrok/ngrok.exe config add-authtoken ${{ secrets.NGROK_AUTH_TOKEN }}
+
+    - name: Ativando o Acesso Remoto (RDP)
+      run: |
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
+
+    - name: Criando Usuario e Senha
+      run: |
+        $Password = ConvertTo-SecureString "SenhaSegura123!" -AsPlainText -Force
+        New-LocalUser "GitHubAdmin" -Password $Password -Description "RDP Admin"
+        Add-LocalGroupMember -Group "Administradores" -Member "GitHubAdmin"
+        Add-LocalGroupMember -Group "Usuários da área de trabalho remota" -Member "GitHubAdmin"
+
+    - name: Iniciando o Tunel Ngrok
+      run: |
+        Start-Process ./ngrok/ngrok.exe -ArgumentList "tcp 3389"
+        Start-Sleep -Seconds 10
+
+    - name: Obtendo IP do RDP
+      run: |
+        $Tunnel = Invoke-RestMethod http://127.0.0
+        $Address = $Tunnel.tunnels.public_url -replace "tcp://", ""
+        Write-Host "=========================================="
+        Write-Host "CONECTE NO SEU RDP COM O ENDEREÇO ABAIXO:"
+        Write-Host $Address
+        Write-Host "Usuário: GitHubAdmin"
+        Write-Host "Senha: SenhaSegura123!"
+        Write-Host "=========================================="
+        Start-Sleep -Seconds 21600
+
